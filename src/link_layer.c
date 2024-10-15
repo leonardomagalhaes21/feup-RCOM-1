@@ -6,6 +6,19 @@
 // MISC
 #define _POSIX_SOURCE 1 // POSIX compliant source
 
+int sendFrame(int fd, unsigned char address, unsigned char ctrl) {
+    unsigned char buf[5] = {0};
+    buf[0] = FLAG;
+    buf[1] = address;
+    buf[2] = ctrl;
+    buf[3] = address ^ ctrl;
+    buf[4] = FLAG;
+    
+    int bytes = write(fd, buf, 5);
+    printf("%d bytes written\n", bytes);
+    return bytes;
+}
+
 ////////////////////////////////////////////////
 // LLOPEN
 ////////////////////////////////////////////////

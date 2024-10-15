@@ -23,9 +23,17 @@ typedef struct
 // Maximum number of bytes that application layer should send to link layer
 #define MAX_PAYLOAD_SIZE 1000
 
+#define FLAG 0x7E
+#define ADRESS_SEN 0x03
+#define ADRESS_REC 0X01
+#define CTRL_SET 0X03
+#define CTRL_UA 0X07
+
 // MISC
 #define FALSE 0
 #define TRUE 1
+
+int sendFrame(int fd, unsigned char address, unsigned char ctrl);
 
 // Open a connection using the "port" parameters defined in struct linkLayer.
 // Return "1" on success or "-1" on error.
