@@ -30,6 +30,16 @@ typedef struct
     int timeout;
 } LinkLayer;
 
+typedef enum
+{
+    START,
+    FLAG_RCV,
+    A_RCV,
+    C_RCV,
+    BCC_OK,
+    STOP
+} StateMachine;
+
 // SIZE of maximum acceptable payload.
 // Maximum number of bytes that application layer should send to link layer
 #define MAX_PAYLOAD_SIZE 1000
@@ -51,6 +61,8 @@ typedef struct
 int sendFrame(unsigned char address, unsigned char ctrl);
 void alarmHandler(int signal);
 
+StateMachine llopen_tx_state_machine(unsigned char byte, StateMachine state);
+StateMachine llopen_rx_state_machine(unsigned char byte, StateMachine state);
 
 
 // Open a connection using the "port" parameters defined in struct linkLayer.
