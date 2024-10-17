@@ -6,7 +6,6 @@
 // MISC
 #define _POSIX_SOURCE 1 // POSIX compliant source
 
-volatile int STOP = FALSE;
 int alarmEnabled = FALSE;
 int alarmCount = 0;
 
@@ -31,6 +30,126 @@ void alarmHandler(int signal)
 }
 
 
+StateMachine llopen_tx_state_machine(unsigned char byte, StateMachine state){
+    switch (state) {
+        case START:
+            if (byte == FLAG) {
+                state = FLAG_RCV;
+                printf("var = 0x%02X\n", FLAG);
+            }
+            break;
+        
+        case FLAG_RCV:
+            if (byte == ADRESS_REC) {
+                state = A_RCV;
+                printf("var = 0x%02X\n", ADRESS_REC);
+            }
+            else if (byte != FLAG) {
+                state = START;
+            }
+            break;
+        
+        case A_RCV:
+            if (byte == CTRL_UA) {
+                state = C_RCV;
+                printf("var = 0x%02X\n", CTRL_UA);
+            }
+            else if (byte == FLAG) {
+                state = FLAG_RCV;
+            }
+            else {
+                state = START;
+            }
+            break;
+        
+        case C_RCV:
+            if (byte == (ADRESS_REC ^ CTRL_UA)) {
+                state = BCC_OK;
+                printf("var = 0x%02X\n", ADRESS_REC ^ CTRL_UA);
+            }
+            else if (byte == FLAG) {
+                state = FLAG_RCV;
+            }
+            else {
+                state = START;
+            }
+            break;
+        case BCC_OK:
+            if (byte == FLAG) {
+                state = STOP;
+                printf("var = 0x%02X\n", FLAG);
+            }
+            else {
+                state = START;
+            }
+            break;
+        
+        default:
+            break;
+    }
+    return state;
+}
+
+StateMachine llopen_rx_state_machine(unsigned char byte, StateMachine state){
+    switch (state) {
+        case START:
+            if (byte == FLAG) {
+                state = FLAG_RCV;
+                printf("var = 0x%02X\n", FLAG);
+            }
+            break;
+        
+        case FLAG_RCV:
+            if (byte == ADRESS_SEN) {
+                state = A_RCV;
+                printf("var = 0x%02X\n", ADRESS_SEN);
+            }
+            else if (byte != FLAG) {
+                state = START;
+            }
+            break;
+        
+        case A_RCV:
+            if (byte == CTRL_SET) {
+                state = C_RCV;
+                printf("var = 0x%02X\n", CTRL_SET);
+            }
+            else if (byte == FLAG) {
+                state = FLAG_RCV;
+            }
+            else {
+                state = START;
+            }
+            break;
+        
+        case C_RCV:
+            if (byte == (ADRESS_SEN ^ CTRL_SET)) {
+                state = BCC_OK;
+                printf("var = 0x%02X\n", ADRESS_SEN ^ CTRL_SET);
+            }
+            else if (byte == FLAG) {
+                state = FLAG_RCV;
+            }
+            else {
+                state = START;
+            }
+            break;
+        case BCC_OK:
+            if (byte == FLAG) {
+                state = STOP;
+                printf("var = 0x%02X\n", FLAG);
+            }
+            else {
+                state = START;
+            }
+            break;
+        
+        default:
+            break;
+    }
+    return state;
+}
+
 ////////////////////////////////////////////////
 // LLOPEN
 ////////////////////////////////////////////////
@@ -44,107 +163,56 @@ int llopen(LinkLayer connectionParameters)
 
     if (connectionParameters.role == LlTx) {
 
-        /*struct sigaction act = {0};
+        struct sigaction act = {0};
         act.sa_handler = &alarmHandler;
         if (sigaction(SIGALRM, &act, NULL) == -1)
         {
             perror("sigaction");
             exit(EXIT_FAILURE);
-        }*/
-        (void)signal(SIGALRM, alarmHandler);
-
-        int bytes = 0;
-        while (alarmCount < connectionParameters.nRetransmissions) {
-            if (alarmEnabled == FALSE) {
-                bytes = sendFrame(ADRESS_SEN, CTRL_SET);
-                printf("%d bytes written\n", bytes);
-
-                alarm(connectionParameters.timeout); // Set alarm to be triggered in 4s
-                alarmEnabled = TRUE;
-            }
-
-            unsigned char buf_set[BUF_SIZE] = {0};
-            int bytes_read = 0;
-            //erro aqui ver depois fica parado a dar read
-            while (bytes_read < 5){
-                unsigned char byte_content = 0;
-                int byte = readByteSerialPort(&byte_content);
-                if (byte < 0){
-                    printf("fatal error 1 \n");
-                    return -1;
-                }
-                else if (byte == 0){
-                    printf("byte 0 \n");
-                    continue;
-                }
-                else {
-                    buf_set[bytes_read] = byte_content;
-                    bytes_read++;
-                }
-            }
-            
-
-            for(int i = 0; i < bytes_read; i++){
-                printf("var = 0x%02X\n", buf_set[i]);
-            }
-
-
-            if (bytes_read == 5) {
-                //buf_set[bytes_read] = '\0';
-                if (buf_set[0] == FLAG && buf_set[1] == ADRESS_REC && buf_set[2] == CTRL_UA && buf_set[3] == (buf_set[1] ^ buf_set[2]) && buf_set[4] == FLAG){
-                    printf("Received correctly\n");
-
-                    alarm(0);
-                    alarmEnabled = FALSE;
-                    break;
-                }
-            }
         }
+        //(void)signal(SIGALRM, alarmHandler);
 
+        unsigned char byte = 0;
+        int nRetrasmissions = connectionParameters.nRetransmissions;
+        int timeout = connectionParameters.timeout;
+        StateMachine state = START;
+
+        while (state != STOP && nRetrasmissions > 0) {
+            printf("Sending SET\n");
+            sendFrame(ADRESS_SEN, CTRL_SET);
+            alarm(timeout);
+            alarmEnabled = TRUE;
+            printf("Waiting for response\n");
+            while (state != STOP && alarmEnabled == TRUE) {
+                if (readByteSerialPort(&byte) > 0){
+                    state = llopen_tx_state_machine(byte, state);
+                    if (state == STOP) {
+                        printf("Received UA\n");
+                        printf("Connection established\n");
+                        alarmEnabled = FALSE;
+                        alarm(0);
+                    }
+                }
+            }
+            nRetrasmissions--;
+        }
     }
 
     else if (connectionParameters.role == LlRx) {
-           // Loop for input
-        unsigned char buf[BUF_SIZE] = {0};
-
-        while (STOP == FALSE) {   
-
-            int bytes_read = 0;
-            while (bytes_read < 5){
-                unsigned char byte_content = 0;
-                int byte = readByteSerialPort(&byte_content);
-                if (byte < 0){
-                    printf("fatal error 2\n");
-                    return -1;
-                }
-                else if (byte == 0){
-                    continue;
-                }
-                else {
-                    buf[bytes_read] = byte_content;
-                    bytes_read++;
+        unsigned char byte = 0;
+        StateMachine state = START;
+        printf("Waiting for SET\n");
+        while (state != STOP) {
+            if (readByteSerialPort(&byte) > 0){
+                state = llopen_rx_state_machine(byte, state);
+                if (state == STOP) {
+                    printf("Received SET\n");
                 }
             }
-            buf[bytes_read] = '\0'; // Set end of string to '\0'
-            
-            if(buf[0] == FLAG && buf[1] == ADRESS_SEN && buf[2] == CTRL_SET && buf[3] == ( buf[1] ^ buf[2] ) && buf[4] == FLAG) {
-                printf("Message received correctly from sender\n");
-                
-                for(int i=0; i<5; i++) {
-                    printf("var = 0x%02X\n", buf[i]);
-                }
-
-                sleep(1);
-                int bytes = sendFrame(ADRESS_REC, CTRL_UA);
-                printf("%d bytes written\n", bytes);
-                
-                STOP = TRUE;
-            }
-            
         }
+        printf("Sending UA\n");
+        sendFrame(ADRESS_REC, CTRL_UA);
     }
-
-    // TODO
 
     return 1;
 }
