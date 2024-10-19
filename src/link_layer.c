@@ -9,7 +9,8 @@
 int alarmEnabled = FALSE;
 int alarmCount = 0;
 
-int information_frame_number = 0;
+int information_frame_number_tx = 0;
+int information_frame_number_rx = 1;
 
 int nRetrasmissions = 0;
 int timeout = 0;
@@ -112,7 +113,7 @@ int llwrite(const unsigned char *buf, int bufSize)
     unsigned char *information_frame = (unsigned char *) malloc(information_frame_size);
     information_frame[0] = FLAG;
     information_frame[1] = ADRESS_SEN;
-    information_frame[2] = NS(information_frame_number);
+    information_frame[2] = NS(information_frame_number_tx);
     information_frame[3] = information_frame[1] ^ information_frame[2];
     memcpy(information_frame + 4, buf, bufSize);
     unsigned char bcc2 = 0;
@@ -180,13 +181,13 @@ int llwrite(const unsigned char *buf, int bufSize)
         alarm(timeout);
         alarmEnabled = TRUE;
         printf("Waiting for response\n");
+        unsigned char response = 0;
         while (state != STOP && alarmEnabled == TRUE) {
             if (readByteSerialPort(&byte) > 0){
-                unsigned char response = 0;
                 state = llwrite_state_machine(byte, state, &response);
                 if (state == STOP) {
                     if (response == CTRL_RR0 || response == CTRL_RR1) {
-                        information_frame_number = (information_frame_number + 1) % 2;
+                        information_frame_number_tx = (information_frame_number_tx + 1) % 2;
                         printf("Received RR\n");
                         accepted = TRUE;
                         break;
@@ -214,9 +215,21 @@ int llwrite(const unsigned char *buf, int bufSize)
 ////////////////////////////////////////////////
 int llread(unsigned char *packet)
 {
-    // TODO
+    unsigned char byte = 0;
+    StateMachine state = START;
+    unsigned char ctrl_field = 0;
+    int packet_index = 0;
 
-    return 0;
+    while (state != STOP) {
+        if (readByteSerialPort(&byte) > 0){
+            state = llread_state_machine(byte, state, &ctrl_field, packet, &packet_index);
+            if (state == STOP) 
+                return packet_index;
+            
+        }
+    }
+
+    return -1;
 }
 
 ////////////////////////////////////////////////
@@ -413,3 +426,125 @@ StateMachine llwrite_state_machine(unsigned char byte, StateMachine state, unsig
     }
     return state;
 }
+
+StateMachine llread_state_machine(unsigned char byte, StateMachine state, unsigned char *ctrl_field, unsigned char *packet, int *packet_index){
+    switch (state) {
+        case START:
+            if (byte == FLAG) {
+                state = FLAG_RCV;
+                printf("var = 0x%02X\n", FLAG);
+            }
+            break;
+        
+        case FLAG_RCV:
+            if (byte == ADRESS_SEN) {
+                state = A_RCV;
+                printf("var = 0x%02X\n", ADRESS_SEN);
+            }
+            else if (byte != FLAG) {
+                state = START;
+            }
+            break;
+        
+        case A_RCV:
+            if (byte == NS(0) || byte == NS(1)) { 
+                state = C_RCV;
+                *ctrl_field = byte;
+                printf("var = 0x%02X\n", byte);
+            }
+            else if (byte == FLAG) {
+                state = FLAG_RCV;
+            }
+            else {
+                state = START;
+            }
+            break;
+        
+        case C_RCV:
+            if (byte == (ADRESS_SEN ^ *ctrl_field)) {
+                state = DATA_READ;
+                printf("var = 0x%02X\n", ADRESS_SEN ^ *ctrl_field);
+            }
+            else if (byte == FLAG) {
+                state = FLAG_RCV;
+            }
+            else {
+                state = START;
+            }
+            break;
+
+        case DATA_READ:
+            if (byte == FLAG) {
+                unsigned char bcc2 = packet[*packet_index - 1];
+                unsigned char bcc2_calc = 0;
+                (*packet_index)--;
+                packet[*packet_index] = '\0'; //close the packet
+                printf("var = 0x%02X\n", FLAG);
+                for (int i = 0; i < *packet_index; i++) {
+                    bcc2_calc ^= packet[i];
+                }
+                state = STOP;
+                if (bcc2 == bcc2_calc) { // BCC2 is correct
+                    if (*ctrl_field != NS(information_frame_number_rx)) {
+                        sendFrame(ADRESS_SEN, *ctrl_field == NS(0) ? CTRL_RR1 : CTRL_RR0);
+                        information_frame_number_rx = (information_frame_number_rx + 1) % 2;
+                        printf("Sent frame, received correctly\n");
+                    }
+                    else {
+                        sendFrame(ADRESS_SEN, *ctrl_field == NS(0) ? CTRL_RR0 : CTRL_RR1);
+                        printf("Sent frame, already received, bcc2 correct\n");
+                        *packet_index = 0; // reset packet index
+                    }
+                }
+                else { // BCC2 is incorrect
+                    if (*ctrl_field != NS(information_frame_number_rx)) {
+                        sendFrame(ADRESS_SEN, *ctrl_field == NS(0) ? CTRL_REJ0 : CTRL_REJ1);
+                        printf("Sent frame, received incorrectly\n");
+                        *packet_index = -1; // packet index is -1 to indicate that the packet was not received correctly
+                    }
+                    else {
+                        sendFrame(ADRESS_SEN, *ctrl_field == NS(0) ? CTRL_RR0 : CTRL_RR1);
+                        printf("Sent frame, already received, bcc2 incorrect\n");
+                        *packet_index = 0; // reset packet index
+                    }
+                    
+                }
+
+            }
+            else if (byte == ESC) {
+                state = DATA_READ_ESC;
+            }
+            else {
+                packet[*packet_index] = byte;
+                printf("var = 0x%02X\n", byte);
+                (*packet_index)++;
+            }
+            break;
+        
+        case DATA_READ_ESC:
+            if (byte == 0x5E) {
+                packet[*packet_index] = FLAG;
+                printf("var = 0x%02X\n", FLAG);
+                (*packet_index)++;
+            }
+            else if (byte == 0x5D) {
+                packet[*packet_index] = ESC;
+                printf("var = 0x%02X\n", ESC);
+                (*packet_index)++;
+            }
+            else {
+                packet[*packet_index] = ESC;
+                packet[*packet_index + 1] = byte;
+                printf("var = 0x%02X\n", ESC);
+                printf("var = 0x%02X\n", byte);
+                (*packet_index) += 2;
+            }
+            state = DATA_READ;
+            break;
+
+        default:
+            break;
+    }
+    return state;
+}
+
