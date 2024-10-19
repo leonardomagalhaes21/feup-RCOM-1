@@ -49,6 +49,15 @@ typedef enum
 #define ADRESS_REC 0X01
 #define CTRL_SET 0X03
 #define CTRL_UA 0X07
+#define CTRL_RR0 0XAA
+#define CTRL_RR1 0XAB
+#define CTRL_REJ0 0X54
+#define CTRL_REJ1 0X55
+#define CTRL_DISC 0X0B
+
+#define ESC 0x7D
+
+#define NS(n) (n << 6)
 
 #define BUF_SIZE 256
 
@@ -63,7 +72,7 @@ void alarmHandler(int signal);
 
 StateMachine llopen_tx_state_machine(unsigned char byte, StateMachine state);
 StateMachine llopen_rx_state_machine(unsigned char byte, StateMachine state);
-
+StateMachine llwrite_state_machine(unsigned char byte, StateMachine state, unsigned char* response);
 
 // Open a connection using the "port" parameters defined in struct linkLayer.
 // Return "1" on success or "-1" on error.

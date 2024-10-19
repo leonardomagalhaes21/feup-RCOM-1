@@ -27,7 +27,20 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
 
     strcpy(connect_par.serialPort,serialPort);
 
-    llopen(connect_par);
+    int open = llopen(connect_par);
+    if (open < 0) {
+        return;
+    }
+
+
+    // testar
+    const unsigned char buffer[] = {0x01, 0x02, 0x03, 0x04, 0x05};
+    int bufferSize = sizeof(buffer) / sizeof(buffer[0]);
+    
+    int result = llwrite(buffer, bufferSize);
+    if (result < 0) {
+        return;
+    }
 
     // TODO
 }
