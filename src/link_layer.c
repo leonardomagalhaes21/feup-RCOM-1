@@ -235,9 +235,73 @@ int llread(unsigned char *packet)
 ////////////////////////////////////////////////
 // LLCLOSE
 ////////////////////////////////////////////////
-int llclose(int showStatistics)
+int llclose(int showStatistics, LinkLayer connectionParameters)
 {
-    // TODO
+
+    if (connectionParameters.role == LlTx) {
+        struct sigaction act = {0};
+        act.sa_handler = &alarmHandler;
+        if (sigaction(SIGALRM, &act, NULL) == -1)
+        {
+            perror("sigaction");
+            exit(EXIT_FAILURE);
+        }
+        //(void)signal(SIGALRM, alarmHandler);
+
+        unsigned char byte = 0;
+        int nRetrasmissions_aux = nRetrasmissions;
+        StateMachine state = START;
+
+        while (state != STOP && nRetrasmissions_aux > 0) {
+            printf("Sending DISC\n");
+            sendFrame(ADRESS_SEN, CTRL_DISC);
+            alarm(timeout);
+            alarmEnabled = TRUE;
+            printf("Waiting for response\n");
+            while (state != STOP && alarmEnabled == TRUE) {
+                if (readByteSerialPort(&byte) > 0){
+                    state = llclose_tx_state_machine(byte, state);
+                    if (state == STOP) {
+                        printf("Received DISC\n");
+                        printf("Sending UA\n");
+                        sendFrame(ADRESS_SEN, CTRL_UA);
+                        alarmEnabled = FALSE;
+                        alarm(0);
+                        printf("Connection closed\n");
+                    }
+                }
+            }
+            nRetrasmissions_aux--;
+        }
+    }
+    else if (connectionParameters.role == LlRx) {
+        unsigned char byte = 0;
+        StateMachine state = START;
+        unsigned char control = 0;
+        printf("Waiting for DISC\n");
+        while (state != STOP) {
+            if (readByteSerialPort(&byte) > 0){
+                state = llclose_rx_state_machine(byte, state, &control);
+                if (state == STOP) {
+                    printf("Received DISC\n");
+                }
+            }
+        }
+        printf("Sending DISC\n");
+        sendFrame(ADRESS_REC, CTRL_DISC);
+        printf("Waiting for UA\n");
+        state = START;
+        while (state != STOP) {
+            if (readByteSerialPort(&byte) > 0) {
+                state = llclose_rx_state_machine(byte, state, &control);
+                if (state == STOP) {
+                    printf("Received UA\n");
+                    printf("Connection closed\n");
+                }
+            }
+        }
+    }
+    
 
     int clstat = closeSerialPort();
     return clstat;
@@ -542,6 +606,127 @@ StateMachine llread_state_machine(unsigned char byte, StateMachine state, unsign
             state = DATA_READ;
             break;
 
+        default:
+            break;
+    }
+    return state;
+}
+
+StateMachine llclose_tx_state_machine(unsigned char byte, StateMachine state){
+    switch (state) {
+        case START:
+            if (byte == FLAG) {
+                state = FLAG_RCV;
+                printf("var = 0x%02X\n", FLAG);
+            }
+            break;
+        
+        case FLAG_RCV:
+            if (byte == ADRESS_REC) {
+                state = A_RCV;
+                printf("var = 0x%02X\n", ADRESS_REC);
+            }
+            else if (byte != FLAG) {
+                state = START;
+            }
+            break;
+        
+        case A_RCV:
+            if (byte == CTRL_DISC) {
+                state = C_RCV;
+                printf("var = 0x%02X\n", CTRL_DISC);
+            }
+            else if (byte == FLAG) {
+                state = FLAG_RCV;
+            }
+            else {
+                state = START;
+            }
+            break;
+        
+        case C_RCV:
+            if (byte == (ADRESS_REC ^ CTRL_DISC)) {
+                state = BCC_OK;
+                printf("var = 0x%02X\n", ADRESS_REC ^ CTRL_DISC);
+            }
+            else if (byte == FLAG) {
+                state = FLAG_RCV;
+            }
+            else {
+                state = START;
+            }
+            break;
+        case BCC_OK:
+            if (byte == FLAG) {
+                state = STOP;
+                printf("var = 0x%02X\n", FLAG);
+            }
+            else {
+                state = START;
+            }
+            break;
+        
+        default:
+            break;
+    }
+    return state;
+}
+
+StateMachine llclose_rx_state_machine(unsigned char byte, StateMachine state, unsigned char* control){
+    switch (state) {
+        case START:
+            if (byte == FLAG) {
+                state = FLAG_RCV;
+                printf("var = 0x%02X\n", FLAG);
+            }
+            break;
+        
+        case FLAG_RCV:
+            if (byte == ADRESS_SEN) {
+                state = A_RCV;
+                printf("var = 0x%02X\n", ADRESS_SEN);
+            }
+            else if (byte != FLAG) {
+                state = START;
+            }
+            break;
+        
+        case A_RCV:
+            if (byte == CTRL_DISC || byte == CTRL_UA) {
+                state = C_RCV;
+                *control = byte;
+                printf("var = 0x%02X\n", byte);
+            }
+            else if (byte == FLAG) {
+                state = FLAG_RCV;
+            }
+            else {
+                state = START;
+            }
+            break;
+        
+        case C_RCV:
+            if (byte == (ADRESS_SEN ^ *control)) {
+                state = BCC_OK;
+                printf("var = 0x%02X\n", ADRESS_SEN ^ *control);
+            }
+            else if (byte == FLAG) {
+                state = FLAG_RCV;
+            }
+            else {
+                state = START;
+            }
+            break;
+        case BCC_OK:
+            if (byte == FLAG) {
+                state = STOP;
+                printf("var = 0x%02X\n", FLAG);
+            }
+            else {
+                state = START;
+            }
+            break;
+        
         default:
             break;
     }

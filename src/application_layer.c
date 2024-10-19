@@ -42,6 +42,10 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         if (result < 0) {
             return;
         }
+        int r = llclose(0, connect_par);
+        if (r < 0) {
+            return;
+        }
     }
     else if (roles == LlRx) {
         unsigned char buffer[256];
@@ -54,6 +58,11 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
             printf("%02X ", buffer[i]);
         }
         printf("\n");
+
+        int r = llclose(0, connect_par);
+        if (r < 0) {
+            return;
+        }
     }
 
     
