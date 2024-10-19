@@ -76,7 +76,8 @@ StateMachine llopen_tx_state_machine(unsigned char byte, StateMachine state);
 StateMachine llopen_rx_state_machine(unsigned char byte, StateMachine state);
 StateMachine llwrite_state_machine(unsigned char byte, StateMachine state, unsigned char* response);
 StateMachine llread_state_machine(unsigned char byte, StateMachine state, unsigned char *ctrl_field, unsigned char *packet, int *packet_index);
-
+StateMachine llclose_tx_state_machine(unsigned char byte, StateMachine state);
+StateMachine llclose_rx_state_machine(unsigned char byte, StateMachine state, unsigned char* control);
 
 // Open a connection using the "port" parameters defined in struct linkLayer.
 // Return "1" on success or "-1" on error.
@@ -93,6 +94,6 @@ int llread(unsigned char *packet);
 // Close previously opened connection.
 // if showStatistics == TRUE, link layer should print statistics in the console on close.
 // Return "1" on success or "-1" on error.
-int llclose(int showStatistics);
+int llclose(int showStatistics, LinkLayer connectionParameters);
 
 #endif // _LINK_LAYER_H_
