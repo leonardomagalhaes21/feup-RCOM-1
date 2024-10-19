@@ -37,6 +37,8 @@ typedef enum
     A_RCV,
     C_RCV,
     BCC_OK,
+    DATA_READ,
+    DATA_READ_ESC,
     STOP
 } StateMachine;
 
@@ -73,6 +75,8 @@ void alarmHandler(int signal);
 StateMachine llopen_tx_state_machine(unsigned char byte, StateMachine state);
 StateMachine llopen_rx_state_machine(unsigned char byte, StateMachine state);
 StateMachine llwrite_state_machine(unsigned char byte, StateMachine state, unsigned char* response);
+StateMachine llread_state_machine(unsigned char byte, StateMachine state, unsigned char *ctrl_field, unsigned char *packet, int *packet_index);
+
 
 // Open a connection using the "port" parameters defined in struct linkLayer.
 // Return "1" on success or "-1" on error.
