@@ -12,7 +12,7 @@ int alarmCount = 0;
 int information_frame_number_tx = 0;
 int information_frame_number_rx = 1;
 
-int nRetrasmissions = 0;
+int nRetransmissions = 0;
 int timeout = 0;
 
 
@@ -62,8 +62,8 @@ int llopen(LinkLayer connectionParameters)
         //(void)signal(SIGALRM, alarmHandler);
 
         unsigned char byte = 0;
-        nRetrasmissions = connectionParameters.nRetransmissions;
-        int nRetrasmissions_aux = nRetrasmissions;
+        nRetransmissions = connectionParameters.nRetransmissions;
+        int nRetrasmissions_aux = nRetransmissions;
         timeout = connectionParameters.timeout;
         StateMachine state = START;
 
@@ -175,11 +175,11 @@ int llwrite(const unsigned char *buf, int bufSize)
     information_frame[frame_index] = FLAG;
 
     StateMachine state = START;
-    int nRetrasmissions_aux = nRetrasmissions;
+    int nRetrasmissions_aux = nRetransmissions;
     unsigned char byte = 0;
     int accepted = FALSE;
 
-    while (state != STOP && nRetrasmissions_aux > 0) {
+    while (state != STOP && nRetrasmissions_aux >= 0) {
         printf("Sending Info\n");
         int bytes = writeBytesSerialPort(information_frame, information_frame_size);
         if (bytes < 0) {
@@ -202,7 +202,7 @@ int llwrite(const unsigned char *buf, int bufSize)
                     }
                     else if (response == CTRL_REJ0 || response == CTRL_REJ1) {
                         printf("Received REJ\n");
-                        nRetrasmissions_aux = nRetrasmissions; // reset retransmissions
+                        nRetrasmissions_aux = nRetransmissions; // reset retransmissions
                     }
                     alarmEnabled = FALSE;
                     alarm(0);
@@ -257,10 +257,10 @@ int llclose(int showStatistics, LinkLayer connectionParameters)
         //(void)signal(SIGALRM, alarmHandler);
 
         unsigned char byte = 0;
-        int nRetrasmissions_aux = nRetrasmissions;
+        int nRetrasmissions_aux = nRetransmissions;
         StateMachine state = START;
 
-        while (state != STOP && nRetrasmissions_aux > 0) {
+        while (state != STOP && nRetrasmissions_aux >= 0) {
             printf("Sending DISC\n");
             sendFrame(ADRESS_SEN, CTRL_DISC);
             alarm(timeout);
