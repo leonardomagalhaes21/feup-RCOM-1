@@ -47,6 +47,9 @@ int llopen(LinkLayer connectionParameters)
         return -1;
     }
 
+    int received = FALSE;
+
+
     if (connectionParameters.role == LlTx) {
 
         struct sigaction act = {0};
@@ -64,7 +67,7 @@ int llopen(LinkLayer connectionParameters)
         timeout = connectionParameters.timeout;
         StateMachine state = START;
 
-        while (state != STOP && nRetrasmissions_aux > 0) {
+        while (state != STOP && nRetrasmissions_aux >= 0) {
             printf("Sending SET\n");
             sendFrame(ADRESS_SEN, CTRL_SET);
             alarm(timeout);
@@ -76,6 +79,7 @@ int llopen(LinkLayer connectionParameters)
                     if (state == STOP) {
                         printf("Received UA\n");
                         printf("Connection established\n");
+                        received = TRUE;
                         alarmEnabled = FALSE;
                         alarm(0);
                     }
@@ -94,6 +98,7 @@ int llopen(LinkLayer connectionParameters)
                 state = llopen_rx_state_machine(byte, state);
                 if (state == STOP) {
                     printf("Received SET\n");
+                    received = TRUE;
                 }
             }
         }
@@ -101,7 +106,10 @@ int llopen(LinkLayer connectionParameters)
         sendFrame(ADRESS_REC, CTRL_UA);
     }
 
-    return 1;
+    if (received == TRUE)
+        return 1;
+    else
+        return -1;
 }
 
 ////////////////////////////////////////////////
