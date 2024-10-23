@@ -185,25 +185,30 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         int fileBytes = fileSize;
         unsigned char sequenceNum = 0;
         while (fileBytes > 0) {
-            unsigned char *data = getFileData(file, fileSize);
+            int bytesToSend = (fileBytes > MAX_PAYLOAD_SIZE) ? MAX_PAYLOAD_SIZE : fileBytes;
+
+            unsigned char *data = getFileData(file, bytesToSend); 
             if (data == NULL) {
                 return;
             }
 
-            unsigned char *dataPacket = buildDataPacket(sequenceNum, MAX_PAYLOAD_SIZE, data);
+            unsigned char *dataPacket = buildDataPacket(sequenceNum, bytesToSend, data);
             if (dataPacket == NULL) {
                 return;
             }
 
-            if (llwrite(dataPacket, MAX_PAYLOAD_SIZE + 4) < 0) {
+            if (llwrite(dataPacket, bytesToSend + 4) < 0) {
                 printf("Error sending data packet\n");
                 return;
             }
             printf("Data packet sent\n");
 
-            fileBytes -= MAX_PAYLOAD_SIZE;
-            sequenceNum = (sequenceNum + 1) % 100; // 0-99
+            fileBytes -= bytesToSend;  
+            sequenceNum = (sequenceNum + 1) % 100; 
+            free(data);
+            free(dataPacket);
         }
+
         control_packet = buildControlPacket(filename, fileSize, 3, &controlPacketSize);
         if (llwrite(control_packet, controlPacketSize) < 0) {
             printf("Error sending end of file packet\n");
@@ -233,38 +238,35 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         printf("\n");
 
         printf("Control packet received\n");
-        //long fileSize = getFileSizeFromPacket(packetRead);
         unsigned char *filename_rx = getFileNameFromPacket(packetRead);
         printf("Filename: %s\n", filename_rx);
 
         FILE *file_rx = fopen("penguin-received.gif", "wb+");
+        if (file_rx == NULL) {
+            printf("Error opening file for writing\n");
+            return;
+        }
 
         while (TRUE) {
-            while(TRUE) {
-                packetSize = llread(packetRead);
-                if (packetSize > 0) {
-                    break;
+            packetSize = llread(packetRead);
+            if (packetSize > 0) {
+                printf("Data packet received\n");
+                if (packetRead[0] == 3) {
+                    break; 
+                } else {
+                    printf("Data packet size: %d\n", packetSize);
+                    unsigned char *buffer = getDataFromPacket(packetRead, packetSize - 4);
+                    if (buffer == NULL) {
+                        return;
+                    }
+
+                    fwrite(buffer, sizeof(unsigned char), packetSize - 4, file_rx);
+                    free(buffer); 
                 }
-            }
-            printf("Data packet received\n");
-            if (packetRead[0] == 3) {
-                break;
-            }
-            else {
-                printf("Data packet size: %d\n", packetSize);
-                unsigned char* buffer = getDataFromPacket(packetRead, packetSize - 4);
-                if (buffer == NULL) {
-                    return;
-                }
-                for (int i = 0; i < packetSize - 4; i++) {
-                    printf("0x%02X ", buffer[i]);
-                }
-                printf("\n");
-                fwrite(buffer, sizeof(unsigned char), packetSize - 4, file_rx);
-                //free(buffer);
             }
         }
         fclose(file_rx);
+
         free(packetRead);
         int r = llclose(0, connect_par);
         if (r < 0) {
