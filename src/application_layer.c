@@ -19,16 +19,12 @@ unsigned char* getFileData(FILE *file, long fileSize) {
     if (file == NULL) 
         return NULL;
 
-    unsigned char *buffer = (unsigned char*)malloc(fileSize);
+    unsigned char *buffer = (unsigned char*)malloc(fileSize * sizeof(unsigned char));
     if (buffer == NULL)
         return NULL;
 
-    size_t bytesRead = fread(buffer, sizeof(unsigned char), fileSize, file);
-    if (bytesRead != fileSize) {
-        perror("Error reading file\n");
-        free(buffer);
-        return NULL;
-    }
+    fread(buffer, sizeof(unsigned char), fileSize, file);
+
     return buffer;
 }
 
@@ -68,6 +64,8 @@ unsigned char* buildControlPacket(const char *filename, long fileSize, unsigned 
     packet[idx] = 0;
     idx++;
     packet[idx] = L1;
+    idx++;
+    //ver aqui
 
     for (int i = L1 - 1; i >= 0; i--) { // big endian
         packet[idx] = (fileSize >> (i * 8)) & 0xFF;
@@ -101,17 +99,22 @@ long getFileSizeFromPacket(unsigned char* packet) {
 }
 
 unsigned char* getFileNameFromPacket(unsigned char* packet) {
-    int byteCount = packet[2 + packet[2] + 1];
+    int idx = 4 + packet[2];
+    int byteCount = packet[idx];
+    idx++;
+    printf("Byte count: %d\n", byteCount);
     unsigned char *filename = (unsigned char*)malloc(byteCount);
     if (filename == NULL)
         return NULL;
     for (int i = 0; i < byteCount; i++) {
-        filename[i] = packet[4 + packet[2] + i];
+        filename[i] = packet[idx];
+        idx++;
     }
     return filename;
 }
 
-unsigned char* getDataFromPacket(unsigned char* packet, int dataSize, unsigned char* buffer) {
+unsigned char* getDataFromPacket(unsigned char* packet, int dataSize) {
+    unsigned char *buffer = (unsigned char*)malloc(dataSize);
     for (int i = 0; i < dataSize; i++) {
         buffer[i] = packet[4 + i];
     }
@@ -173,10 +176,16 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         printf("Control packet sent\n");
         printf("File size: %ld\n", fileSize);
 
+        for (int i = 0; i < controlPacketSize; i++) {
+            printf("0x%02X ", control_packet[i]);
+        }
+        printf("\n");
+
+
         int fileBytes = fileSize;
         unsigned char sequenceNum = 0;
         while (fileBytes > 0) {
-            unsigned char *data = getFileData(file, MAX_PAYLOAD_SIZE);
+            unsigned char *data = getFileData(file, fileSize);
             if (data == NULL) {
                 return;
             }
@@ -208,41 +217,59 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         }
     }
     else if (roles == LlRx) {
-        unsigned char *controlPacket = (unsigned char*)malloc(MAX_PAYLOAD_SIZE);
-        if (controlPacket == NULL) {
+        unsigned char *packetRead = (unsigned char*)malloc(MAX_PAYLOAD_SIZE);
+        if (packetRead == NULL) {
             return;
         }
-        int controlPacketSize = 0;
-        while(controlPacketSize == 0) {
-            controlPacketSize = llread(controlPacket);
+        int packetSize = 0;
+        while(packetSize == 0) {
+            packetSize = llread(packetRead);
         }
-        printf("Control packet received\n");
-        //long fileSize = getFileSizeFromPacket(controlPacket);
-        unsigned char *filename_rx = getFileNameFromPacket(controlPacket);
 
-        FILE *file_rx = fopen((char*)filename_rx, "wb+");
+        printf("Control packet size: %d\n", packetSize);
+        for (int i = 0; i < packetSize; i++) {
+            printf("0x%02X ", packetRead[i]);
+        }
+        printf("\n");
+
+        printf("Control packet received\n");
+        //long fileSize = getFileSizeFromPacket(packetRead);
+        unsigned char *filename_rx = getFileNameFromPacket(packetRead);
+        printf("Filename: %s\n", filename_rx);
+
+        FILE *file_rx = fopen("penguin-received.gif", "wb+");
 
         while (TRUE) {
-            while(controlPacketSize == 0) {
-                controlPacketSize = llread(controlPacket);
+            while(TRUE) {
+                packetSize = llread(packetRead);
+                if (packetSize > 0) {
+                    break;
+                }
             }
             printf("Data packet received\n");
-            if (controlPacket[0] == 3) {
+            if (packetRead[0] == 3) {
                 break;
             }
             else {
-                unsigned char* buffer = (unsigned char*)malloc(controlPacketSize);
+                printf("Data packet size: %d\n", packetSize);
+                unsigned char* buffer = getDataFromPacket(packetRead, packetSize - 4);
                 if (buffer == NULL) {
                     return;
                 }
-                getDataFromPacket(controlPacket, controlPacketSize - 4, buffer);
-                //seg fault here below
-                fwrite(buffer, sizeof(unsigned char), controlPacketSize - 4, file_rx);
-                free(buffer);
+                for (int i = 0; i < packetSize - 4; i++) {
+                    printf("0x%02X ", buffer[i]);
+                }
+                printf("\n");
+                fwrite(buffer, sizeof(unsigned char), packetSize - 4, file_rx);
+                //free(buffer);
             }
         }
         fclose(file_rx);
-        free(controlPacket);
+        free(packetRead);
+        int r = llclose(0, connect_par);
+        if (r < 0) {
+            return;
+        }
 
     }
 

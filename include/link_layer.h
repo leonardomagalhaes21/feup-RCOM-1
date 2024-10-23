@@ -59,7 +59,7 @@ typedef enum
 
 #define ESC 0x7D
 
-#define NS(n) (n << 8)
+#define NS(n) (n << 7)
 
 #define BUF_SIZE 256
 
