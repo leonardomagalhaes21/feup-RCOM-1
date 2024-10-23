@@ -3,6 +3,69 @@
 #include "application_layer.h"
 #include <string.h>
 
+long getFileSize(FILE *file) {
+    if (file == NULL)
+        return -1;
+
+    long currentPos = ftell(file);
+    fseek(file, 0, SEEK_END);
+    long size = ftell(file);
+    fseek(file, currentPos, SEEK_SET);
+
+    return size;
+}
+
+unsigned char* getFileData(FILE *file, long fileSize) {
+    if (file == NULL) 
+        return NULL;
+
+    unsigned char *buffer = (unsigned char*)malloc(fileSize);
+    if (buffer == NULL)
+        return NULL;
+
+    size_t bytesRead = fread(buffer, sizeof(unsigned char), fileSize, file);
+    if (bytesRead != fileSize) {
+        perror("Error reading file\n");
+        free(buffer);
+        return NULL;
+    }
+    return buffer;
+}
+
+unsigned char* buildDataPacket(unsigned char sequenceNum, int dataSize, unsigned char *data) {
+    int packetSize = dataSize + 4;
+    unsigned char *packet = (unsigned char*)malloc(packetSize);
+    if (packet == NULL)
+        return NULL;
+
+    packet[0] = 2;
+    packet[1] = sequenceNum;
+    packet[2] = (dataSize >> 8) & 0xFF; // msb
+    packet[3] = dataSize & 0xFF; // lsb
+
+    memcpy(packet + 4, data, dataSize);
+
+    return packet;
+}
+
+unsigned char* buildControlPacket(const char *filename, long fileSize, unsigned char controlField) {
+    int V1 = 0;
+    int V2 = strlen(filename);
+    int idx = 0;
+
+    int packetSize = V1 + V2 + 5;
+    unsigned char *packet = (unsigned char*)malloc(packetSize);
+    if (packet == NULL)
+        return NULL;
+    
+    packet[idx] = controlField;
+    idx++;
+    // TODO
+
+         
+}
+
+ 
 void applicationLayer(const char *serialPort, const char *role, int baudRate,
                       int nTries, int timeout, const char *filename)
 {
