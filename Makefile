@@ -1,9 +1,5 @@
 # Makefile to build the project
-# NOTE: This file must not be changed - oops
-
-# ------------------------ ! ------------------------
-# Adapted by Nuno Rios [up202206272@up.pt] to support macOS
-# ------------------------ ! ------------------------
+# NOTE: This file must not be changed
 
 # Parameters
 OS := $(shell uname -s)
