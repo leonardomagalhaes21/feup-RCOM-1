@@ -203,6 +203,7 @@ int llwrite(const unsigned char *buf, int bufSize)
                     else if (response == CTRL_REJ0 || response == CTRL_REJ1) {
                         printf("Received REJ\n");
                         nRetrasmissions_aux = nRetransmissions; // reset retransmissions
+                        state = START;
                     }
                     alarmEnabled = FALSE;
                     alarm(0);
