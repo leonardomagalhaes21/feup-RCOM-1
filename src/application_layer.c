@@ -241,7 +241,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         unsigned char *filename_rx = getFileNameFromPacket(packetRead);
         printf("Filename: %s\n", filename_rx);
 
-        FILE *file_rx = fopen("penguin-received.gif", "wb+");
+        FILE *file_rx = fopen(filename, "wb+");
         if (file_rx == NULL) {
             printf("Error opening file for writing\n");
             return;
