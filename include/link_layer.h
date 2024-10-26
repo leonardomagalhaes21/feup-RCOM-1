@@ -42,6 +42,12 @@ typedef enum
     STOP
 } StateMachine;
 
+typedef struct {
+    int numFrames;
+    int numRetransmissions;
+    int numTimeouts;
+} CommunicationStats;
+
 // SIZE of maximum acceptable payload.
 // Maximum number of bytes that application layer should send to link layer
 #define MAX_PAYLOAD_SIZE 1000
@@ -95,5 +101,7 @@ int llread(unsigned char *packet);
 // if showStatistics == TRUE, link layer should print statistics in the console on close.
 // Return "1" on success or "-1" on error.
 int llclose(int showStatistics, LinkLayer connectionParameters);
+
+void printStatistics(const CommunicationStats *stats);
 
 #endif // _LINK_LAYER_H_
