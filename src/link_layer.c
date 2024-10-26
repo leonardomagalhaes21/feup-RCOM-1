@@ -15,6 +15,8 @@ int information_frame_number_rx = 1;
 int nRetransmissions = 0;
 int timeout = 0;
 
+CommunicationStats stats = {0, 0, 0};
+
 
 int sendFrame(unsigned char address, unsigned char ctrl) {
     unsigned char buf[5] = {0};
@@ -25,6 +27,7 @@ int sendFrame(unsigned char address, unsigned char ctrl) {
     buf[4] = FLAG;
 
     int bytes = writeBytesSerialPort(buf, 5);
+    stats.numFrames++;
     return bytes;
 }
 void alarmHandler(int signal)
@@ -33,6 +36,8 @@ void alarmHandler(int signal)
     alarmCount++;
 
     printf("Alarm #%d\n", alarmCount);
+
+    stats.numTimeouts++;
 }
 
 
@@ -85,6 +90,8 @@ int llopen(LinkLayer connectionParameters)
                     }
                 }
             }
+            if (nRetrasmissions_aux < nRetransmissions)
+                stats.numRetransmissions++;
             nRetrasmissions_aux--;
         }
     }
@@ -185,6 +192,7 @@ int llwrite(const unsigned char *buf, int bufSize)
         if (bytes < 0) {
             return -1;
         }
+        stats.numFrames++;
         
         alarm(timeout);
         alarmEnabled = TRUE;
@@ -203,6 +211,7 @@ int llwrite(const unsigned char *buf, int bufSize)
                     else if (response == CTRL_REJ0 || response == CTRL_REJ1) {
                         printf("Received REJ\n");
                         nRetrasmissions_aux = nRetransmissions; // reset retransmissions
+                        stats.numRetransmissions++;
                         state = START;
                     }
                     alarmEnabled = FALSE;
@@ -210,6 +219,8 @@ int llwrite(const unsigned char *buf, int bufSize)
                 }
             }
         }
+        if (nRetrasmissions_aux < nRetransmissions)
+            stats.numRetransmissions++;
         nRetrasmissions_aux--;
     }
     free(information_frame);
@@ -280,8 +291,15 @@ int llclose(int showStatistics, LinkLayer connectionParameters)
                     }
                 }
             }
+            if (nRetrasmissions_aux < nRetransmissions)
+                stats.numRetransmissions++;
             nRetrasmissions_aux--;
         }
+
+        if (showStatistics) {
+            printStatistics(&stats);
+        }
+
     }
     else if (connectionParameters.role == LlRx) {
         unsigned char byte = 0;
@@ -740,5 +758,22 @@ StateMachine llclose_rx_state_machine(unsigned char byte, StateMachine state, un
             break;
     }
     return state;
+}
+
+void printStatistics(const CommunicationStats *stats) {
+    printf("\n");
+    printf("========================================\n");
+    printf("       COMMUNICATION STATISTICS         \n");
+    printf("========================================\n");
+    printf("| %-36s |\n", "Number of Frames");
+    printf("| %-36d |\n", stats->numFrames);
+    printf("|--------------------------------------|\n");
+    printf("| %-36s |\n", "Number of Retransmissions");
+    printf("| %-36d |\n", stats->numRetransmissions);
+    printf("|--------------------------------------|\n");
+    printf("| %-36s |\n", "Number of Timeouts");
+    printf("| %-36d |\n", stats->numTimeouts);
+    printf("========================================\n");
+    printf("\n");
 }
 

@@ -216,7 +216,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         }
         printf("End of file packet sent\n");
         
-        int r = llclose(0, connect_par);
+        int r = llclose(1, connect_par);
         if (r < 0) {
             return;
         }
