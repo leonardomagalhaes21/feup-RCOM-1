@@ -18,7 +18,7 @@ int timeout = 0;
 CommunicationStats stats = {0, 0, 0};
 
 
-int sendFrame(unsigned char address, unsigned char ctrl) {
+int sendSUFrame(unsigned char address, unsigned char ctrl) {
     unsigned char buf[5] = {0};
     buf[0] = FLAG;
     buf[1] = address;
@@ -64,7 +64,6 @@ int llopen(LinkLayer connectionParameters)
             perror("sigaction");
             exit(EXIT_FAILURE);
         }
-        //(void)signal(SIGALRM, alarmHandler);
 
         unsigned char byte = 0;
         nRetransmissions = connectionParameters.nRetransmissions;
@@ -74,7 +73,7 @@ int llopen(LinkLayer connectionParameters)
 
         while (state != STOP && nRetrasmissions_aux >= 0) {
             printf("Sending SET\n");
-            sendFrame(ADRESS_SEN, CTRL_SET);
+            sendSUFrame(ADRESS_SEN, CTRL_SET);
             alarm(timeout);
             alarmEnabled = TRUE;
             printf("Waiting for response\n");
@@ -110,7 +109,7 @@ int llopen(LinkLayer connectionParameters)
             }
         }
         printf("Sending UA\n");
-        sendFrame(ADRESS_REC, CTRL_UA);
+        sendSUFrame(ADRESS_REC, CTRL_UA);
     }
 
     if (received == TRUE)
@@ -266,7 +265,6 @@ int llclose(int showStatistics, LinkLayer connectionParameters)
             perror("sigaction");
             exit(EXIT_FAILURE);
         }
-        //(void)signal(SIGALRM, alarmHandler);
 
         unsigned char byte = 0;
         int nRetrasmissions_aux = nRetransmissions;
@@ -274,7 +272,7 @@ int llclose(int showStatistics, LinkLayer connectionParameters)
 
         while (state != STOP && nRetrasmissions_aux >= 0) {
             printf("Sending DISC\n");
-            sendFrame(ADRESS_SEN, CTRL_DISC);
+            sendSUFrame(ADRESS_SEN, CTRL_DISC);
             alarm(timeout);
             alarmEnabled = TRUE;
             printf("Waiting for response\n");
@@ -284,7 +282,7 @@ int llclose(int showStatistics, LinkLayer connectionParameters)
                     if (state == STOP) {
                         printf("Received DISC\n");
                         printf("Sending UA\n");
-                        sendFrame(ADRESS_SEN, CTRL_UA);
+                        sendSUFrame(ADRESS_SEN, CTRL_UA);
                         alarmEnabled = FALSE;
                         alarm(0);
                         printf("Connection closed\n");
@@ -315,7 +313,7 @@ int llclose(int showStatistics, LinkLayer connectionParameters)
             }
         }
         printf("Sending DISC\n");
-        sendFrame(ADRESS_REC, CTRL_DISC);
+        sendSUFrame(ADRESS_REC, CTRL_DISC);
         printf("Waiting for UA\n");
         state = START;
         while (state != STOP) {
@@ -577,24 +575,24 @@ StateMachine llread_state_machine(unsigned char byte, StateMachine state, unsign
                 state = STOP;
                 if (bcc2 == bcc2_calc) { // BCC2 is correct
                     if (*ctrl_field != NS(information_frame_number_rx)) {
-                        sendFrame(ADRESS_SEN, *ctrl_field == NS(0) ? CTRL_RR1 : CTRL_RR0);
+                        sendSUFrame(ADRESS_SEN, *ctrl_field == NS(0) ? CTRL_RR1 : CTRL_RR0);
                         information_frame_number_rx = (information_frame_number_rx + 1) % 2;
                         printf("Sent frame, received correctly\n");
                     }
                     else {
-                        sendFrame(ADRESS_SEN, *ctrl_field == NS(0) ? CTRL_RR0 : CTRL_RR1);
+                        sendSUFrame(ADRESS_SEN, *ctrl_field == NS(0) ? CTRL_RR0 : CTRL_RR1);
                         printf("Sent frame, already received, bcc2 correct\n");
                         *packet_index = 0; // reset packet index
                     }
                 }
                 else { // BCC2 is incorrect
                     if (*ctrl_field != NS(information_frame_number_rx)) {
-                        sendFrame(ADRESS_SEN, *ctrl_field == NS(0) ? CTRL_REJ0 : CTRL_REJ1);
+                        sendSUFrame(ADRESS_SEN, *ctrl_field == NS(0) ? CTRL_REJ0 : CTRL_REJ1);
                         printf("Sent frame, received incorrectly\n");
-                        *packet_index = -1; // packet index is -1 to indicate that the packet was not received correctly
+                        *packet_index = -1; // packet was not received correctly
                     }
                     else {
-                        sendFrame(ADRESS_SEN, *ctrl_field == NS(0) ? CTRL_RR0 : CTRL_RR1);
+                        sendSUFrame(ADRESS_SEN, *ctrl_field == NS(0) ? CTRL_RR0 : CTRL_RR1);
                         printf("Sent frame, already received, bcc2 incorrect\n");
                         *packet_index = 0; // reset packet index
                     }

@@ -75,7 +75,7 @@ typedef struct {
 
 
 
-int sendFrame(unsigned char address, unsigned char ctrl);
+int sendSUFrame(unsigned char address, unsigned char ctrl);
 void alarmHandler(int signal);
 
 StateMachine llopen_tx_state_machine(unsigned char byte, StateMachine state);

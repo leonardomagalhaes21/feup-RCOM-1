@@ -65,7 +65,6 @@ unsigned char* buildControlPacket(const char *filename, long fileSize, unsigned 
     idx++;
     packet[idx] = L1;
     idx++;
-    //ver aqui
 
     for (int i = L1 - 1; i >= 0; i--) { // big endian
         packet[idx] = (fileSize >> (i * 8)) & 0xFF;
@@ -151,11 +150,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
     }
 
 
-    // testar
     if (roles == LlTx) {
-        //const unsigned char buffer[] = {0x01, 0x02, 0x03, 0x04, 0x7E, 0x05, 0x01, 0x06, 0x05};
-        //int bufferSize = sizeof(buffer) / sizeof(buffer[0]);
-
         FILE *file = fopen(filename, "rb");
         if (file == NULL) {
             return;
