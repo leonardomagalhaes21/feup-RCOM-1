@@ -2,12 +2,14 @@
 
 #include "link_layer.h"
 #include "serial_port.h"
-
+#include <time.h>
 // MISC
 #define _POSIX_SOURCE 1 // POSIX compliant source
 
 int alarmEnabled = FALSE;
 int alarmCount = 0;
+struct timespec startTime, endTime;
+
 
 int information_frame_number_tx = 0;
 int information_frame_number_rx = 1;
@@ -46,6 +48,7 @@ void alarmHandler(int signal)
 ////////////////////////////////////////////////
 int llopen(LinkLayer connectionParameters)
 {
+    clock_gettime(CLOCK_MONOTONIC, &startTime); // Record the start time
     if (openSerialPort(connectionParameters.serialPort,
                        connectionParameters.baudRate) < 0)
     {
@@ -295,6 +298,9 @@ int llclose(int showStatistics, LinkLayer connectionParameters)
         }
 
         if (showStatistics) {
+            clock_gettime(CLOCK_MONOTONIC, &endTime); // Record the end time
+            stats.timeTaken = (endTime.tv_sec - startTime.tv_sec) + 
+                              (endTime.tv_nsec - startTime.tv_nsec) / 1e9; // Calculate the elapsed time
             printStatistics(&stats);
         }
 
@@ -771,6 +777,9 @@ void printStatistics(const CommunicationStats *stats) {
     printf("|--------------------------------------|\n");
     printf("| %-36s |\n", "Number of Timeouts");
     printf("| %-36d |\n", stats->numTimeouts);
+    printf("|--------------------------------------|\n");
+    printf("| %-36s |\n", "Time Taken (seconds)");
+    printf("| %-36.6f |\n", stats->timeTaken);
     printf("========================================\n");
     printf("\n");
 }

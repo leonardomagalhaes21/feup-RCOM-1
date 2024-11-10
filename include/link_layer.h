@@ -46,6 +46,7 @@ typedef struct {
     int numFrames;
     int numRetransmissions;
     int numTimeouts;
+    double timeTaken; // Time taken in seconds
 } CommunicationStats;
 
 // SIZE of maximum acceptable payload.
