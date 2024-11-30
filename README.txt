@@ -1,7 +1,7 @@
 INSTRUCTIONS FOR SERIAL PORT PROTOCOL
 =====================================
 
-This folder contains the base code of the serial port protocol.
+This project implements a protocol for file transfer using a serial port cable. The protocol enables reliable communication between a transmitter and a receiver, even in the presence of cable disconnections or noise.
 
 Project Structure
 -----------------
